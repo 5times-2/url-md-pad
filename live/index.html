@@ -1,0 +1,938 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MD HackPad Live</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2214%22%20fill%3D%22black%22/%3E%3Ctext%20x%3D%2250%22%20y%3D%2265%22%20font-size%3D%2254%22%20text-anchor%3D%22middle%22%20fill%3D%22%2300ff66%22%20font-family%3D%22monospace%22%3EMD%3C/text%3E%3C/svg%3E">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #000;
+      --panel: #050b06;
+      --panel-2: #071109;
+      --text: #b8ffbe;
+      --muted: #5b9b64;
+      --accent: #00ff66;
+      --border: #135e2d;
+      --danger: #ff6b7a;
+      --bar-h: 48px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Noto Sans Mono", monospace;
+    }
+
+    body { min-height: 100vh; }
+
+    #bar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      min-height: var(--bar-h);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      background: rgba(0, 0, 0, 0.94);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+    }
+
+    .brand {
+      margin-right: 4px;
+      color: var(--accent);
+      font-weight: 800;
+      white-space: nowrap;
+      letter-spacing: .04em;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 6px 9px;
+      background: var(--panel);
+      color: var(--text);
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    button:hover, button:focus-visible {
+      border-color: var(--accent);
+      color: var(--accent);
+      outline: none;
+    }
+
+    button.danger:hover, button.danger:focus-visible {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    #status {
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    #editor {
+      width: 100%;
+      min-height: calc(100vh - var(--bar-h));
+      padding: 14px clamp(10px, 3vw, 34px) 42vh;
+    }
+
+    .md-block {
+      position: relative;
+      width: 100%;
+      min-height: 34px;
+      margin: 2px 0;
+      padding: 6px 9px;
+      border: 1px solid transparent;
+      border-radius: 7px;
+      overflow-wrap: anywhere;
+      cursor: text;
+    }
+
+    .md-block:hover {
+      background: var(--panel);
+      border-color: #0c351b;
+    }
+
+    .md-block.is-editing {
+      padding: 0;
+      border-color: var(--accent);
+      background: var(--panel-2);
+      box-shadow: 0 0 0 1px rgba(0, 255, 102, .08);
+    }
+
+    .block-textarea {
+      display: block;
+      width: 100%;
+      min-height: 44px;
+      max-height: 70vh;
+      resize: none;
+      overflow-y: auto;
+      padding: 10px 11px;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--accent);
+      caret-color: var(--accent);
+      font: inherit;
+      font-size: 15px;
+      line-height: 1.58;
+      tab-size: 2;
+      white-space: pre-wrap;
+    }
+
+    .empty-block {
+      color: #356640;
+      min-height: 20px;
+    }
+
+    .empty-block::before { content: "點一下開始輸入 Markdown…"; }
+
+    .md-block h1, .md-block h2, .md-block h3,
+    .md-block h4, .md-block h5, .md-block h6 {
+      color: var(--accent);
+      margin: .25em 0 .35em;
+      line-height: 1.22;
+    }
+
+    .md-block h1 { font-size: 1.8rem; border-bottom: 1px solid var(--border); padding-bottom: .22em; }
+    .md-block h2 { font-size: 1.45rem; border-bottom: 1px solid #0c351b; padding-bottom: .16em; }
+    .md-block h3 { font-size: 1.2rem; }
+    .md-block h4 { font-size: 1.05rem; }
+    .md-block h5 { font-size: .95rem; }
+    .md-block h6 { font-size: .85rem; color: #77c981; }
+
+    .md-block p { margin: .2em 0; line-height: 1.58; }
+    .md-block strong { color: #e2ffe5; }
+    .md-block em { color: #88e692; }
+    .md-block del { color: var(--muted); }
+
+    .md-block a {
+      color: #61ffa0;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .md-block code {
+      padding: .08em .35em;
+      border: 1px solid #174d27;
+      border-radius: 4px;
+      background: #021f0b;
+      color: #8dffa6;
+      font-family: inherit;
+      font-size: .92em;
+    }
+
+    .md-block pre {
+      margin: .4em 0;
+      padding: 11px 12px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: #010e05;
+      line-height: 1.48;
+      tab-size: 2;
+    }
+
+    .md-block pre code {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: #a8ffb1;
+    }
+
+    .code-language {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .md-block blockquote {
+      margin: .35em 0;
+      padding: .25em .8em;
+      border-left: 3px solid var(--accent);
+      background: #031208;
+      color: #8ee79a;
+    }
+
+    .md-block ul, .md-block ol {
+      margin: .25em 0 .25em 1.6em;
+      padding: 0;
+    }
+
+    .md-block li { margin: .2em 0; line-height: 1.5; }
+    .md-block li.task-item { list-style: none; margin-left: -1.35em; }
+    .md-block input[type="checkbox"] { accent-color: var(--accent); vertical-align: middle; }
+
+    .md-block hr {
+      border: 0;
+      border-top: 1px solid var(--border);
+      margin: .8em 0;
+    }
+
+    .table-wrap { overflow-x: auto; margin: .35em 0; }
+
+    .md-block table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .94em;
+    }
+
+    .md-block th, .md-block td {
+      border: 1px solid var(--border);
+      padding: 6px 8px;
+      text-align: left;
+    }
+
+    .md-block th {
+      color: var(--accent);
+      background: #06170a;
+    }
+
+    .hint {
+      position: fixed;
+      right: 10px;
+      bottom: 8px;
+      z-index: 10;
+      padding: 5px 7px;
+      border: 1px solid #0c351b;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, .88);
+      color: #477f50;
+      font-size: 10px;
+      pointer-events: none;
+    }
+
+    #toast {
+      position: fixed;
+      left: 50%;
+      bottom: 26px;
+      z-index: 50;
+      transform: translate(-50%, 12px);
+      padding: 7px 10px;
+      border: 1px solid var(--accent);
+      border-radius: 7px;
+      background: #031108;
+      color: var(--accent);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .16s ease, transform .16s ease;
+      font-size: 12px;
+    }
+
+    #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    @media (max-width: 620px) {
+      #bar { flex-wrap: wrap; }
+      #status { width: 100%; margin: 0; }
+      .hint { display: none; }
+      .md-block h1 { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <header id="bar">
+    <span class="brand">MD HackPad</span>
+    <button id="newBlockBtn" type="button">＋區塊</button>
+    <button id="copyBtn" type="button">複製 Markdown</button>
+    <button id="clearBtn" class="danger" type="button">清空</button>
+    <span id="status">網址暫存中</span>
+  </header>
+
+  <main id="editor" aria-label="Markdown scratchpad"></main>
+  <div class="hint">Enter 渲染 · Shift+Enter 換行 · 點區塊編輯 · Esc 完成</div>
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    "use strict";
+
+    const editor = document.getElementById("editor");
+    const statusEl = document.getElementById("status");
+    const toastEl = document.getElementById("toast");
+    const newBlockBtn = document.getElementById("newBlockBtn");
+    const copyBtn = document.getElementById("copyBtn");
+    const clearBtn = document.getElementById("clearBtn");
+
+    let blocks = splitIntoBlocks(readUrlText());
+    let activeIndex = null;
+    let activeTextarea = null;
+    let committing = false;
+    let urlTimer = 0;
+    let toastTimer = 0;
+
+    renderAll();
+
+    if (blocks.length === 1 && blocks[0] === "") {
+      requestAnimationFrame(() => activateBlock(0));
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "\"": "&quot;",
+        "'": "&#39;"
+      })[char]);
+    }
+
+    function safeUrl(rawUrl) {
+      const value = String(rawUrl || "").trim();
+      if (!value) return "";
+
+      try {
+        const decoded = decodeURIComponent(value).trim().toLowerCase();
+        if (/^(javascript|data|vbscript):/.test(decoded)) return "";
+      } catch (_) {
+        if (/^(javascript|data|vbscript):/i.test(value)) return "";
+      }
+
+      if (/^(https?:|mailto:|tel:|#|\/)/i.test(value)) return value;
+      return "https://" + value;
+    }
+
+    function inlineMarkdown(source) {
+      const tokens = [];
+      const hold = html => {
+        const key = `\u0000MDTOKEN${tokens.length}\u0000`;
+        tokens.push(html);
+        return key;
+      };
+
+      let value = String(source);
+
+      value = value.replace(/`([^`\n]+)`/g, (_, code) =>
+        hold(`<code>${escapeHtml(code)}</code>`)
+      );
+
+      value = value.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+["']([^"']*)["'])?\)/g,
+        (_, alt, url, title) => {
+          const href = safeUrl(url);
+          if (!href) return escapeHtml(alt);
+          const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
+          return hold(`<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"${titleAttr}>[image: ${escapeHtml(alt || "image")}]</a>`);
+        }
+      );
+
+      value = value.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+["']([^"']*)["'])?\)/g,
+        (_, label, url, title) => {
+          const href = safeUrl(url);
+          if (!href) return escapeHtml(label);
+          const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
+          return hold(`<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"${titleAttr}>${escapeHtml(label)}</a>`);
+        }
+      );
+
+      value = escapeHtml(value);
+      value = value.replace(/\\([\\`*{}\[\]()#+\-.!_>~|])/g, "$1");
+      value = value.replace(/\*\*([^\n]+?)\*\*/g, "<strong>$1</strong>");
+      value = value.replace(/__([^\n]+?)__/g, "<strong>$1</strong>");
+      value = value.replace(/~~([^\n]+?)~~/g, "<del>$1</del>");
+      value = value.replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, "$1<em>$2</em>");
+      value = value.replace(/(^|[^_])_([^_\n]+?)_(?!_)/g, "$1<em>$2</em>");
+
+      value = value.replace(/\u0000MDTOKEN(\d+)\u0000/g, (_, index) => tokens[Number(index)] || "");
+      return value;
+    }
+
+    function splitTableRow(line) {
+      let row = line.trim();
+      if (row.startsWith("|")) row = row.slice(1);
+      if (row.endsWith("|")) row = row.slice(0, -1);
+      return row.split("|").map(cell => cell.trim());
+    }
+
+    function isTableSeparator(line) {
+      const cells = splitTableRow(line);
+      return cells.length > 0 && cells.every(cell => /^:?-{3,}:?$/.test(cell));
+    }
+
+    function renderTable(lines, startIndex) {
+      const headers = splitTableRow(lines[startIndex]);
+      const separators = splitTableRow(lines[startIndex + 1]);
+      const aligns = separators.map(cell => {
+        const left = cell.startsWith(":");
+        const right = cell.endsWith(":");
+        if (left && right) return "center";
+        if (right) return "right";
+        return "left";
+      });
+
+      const bodyRows = [];
+      let index = startIndex + 2;
+      while (index < lines.length && lines[index].trim() && lines[index].includes("|")) {
+        bodyRows.push(splitTableRow(lines[index]));
+        index += 1;
+      }
+
+      const headHtml = headers.map((cell, i) =>
+        `<th style="text-align:${aligns[i] || "left"}">${inlineMarkdown(cell)}</th>`
+      ).join("");
+
+      const bodyHtml = bodyRows.map(row =>
+        `<tr>${headers.map((_, i) => `<td style="text-align:${aligns[i] || "left"}">${inlineMarkdown(row[i] || "")}</td>`).join("")}</tr>`
+      ).join("");
+
+      return {
+        html: `<div class="table-wrap"><table><thead><tr>${headHtml}</tr></thead><tbody>${bodyHtml}</tbody></table></div>`,
+        nextIndex: index
+      };
+    }
+
+    function renderList(lines, startIndex) {
+      const first = lines[startIndex];
+      const ordered = /^\s*\d+[.)]\s+/.test(first);
+      const matcher = ordered
+        ? /^(\s*)\d+[.)]\s+(.*)$/
+        : /^(\s*)[-+*]\s+(.*)$/;
+
+      const items = [];
+      let index = startIndex;
+
+      while (index < lines.length) {
+        const match = lines[index].match(matcher);
+        if (!match) break;
+
+        let content = match[2];
+        const task = content.match(/^\[([ xX])\]\s+(.*)$/);
+        const indent = Math.min(6, Math.floor(match[1].replace(/\t/g, "  ").length / 2));
+
+        if (task) {
+          const checked = task[1].toLowerCase() === "x";
+          items.push(`<li class="task-item" style="margin-left:${indent * 1.2}em"><input type="checkbox" disabled ${checked ? "checked" : ""}> ${inlineMarkdown(task[2])}</li>`);
+        } else {
+          items.push(`<li style="margin-left:${indent * 1.2}em">${inlineMarkdown(content)}</li>`);
+        }
+        index += 1;
+      }
+
+      const tag = ordered ? "ol" : "ul";
+      return { html: `<${tag}>${items.join("")}</${tag}>`, nextIndex: index };
+    }
+
+    function renderMarkdown(markdown) {
+      const source = String(markdown || "").replace(/\r\n?/g, "\n");
+      if (!source.trim()) return '<div class="empty-block"></div>';
+
+      const lines = source.split("\n");
+      const html = [];
+      let index = 0;
+
+      while (index < lines.length) {
+        const line = lines[index];
+        const trimmed = line.trim();
+
+        if (!trimmed) {
+          index += 1;
+          continue;
+        }
+
+        const fence = line.match(/^\s*```\s*([\w.+-]*)\s*$/);
+        if (fence) {
+          const language = fence[1] || "";
+          const code = [];
+          index += 1;
+          while (index < lines.length && !/^\s*```\s*$/.test(lines[index])) {
+            code.push(lines[index]);
+            index += 1;
+          }
+          if (index < lines.length) index += 1;
+          const label = language ? `<span class="code-language">${escapeHtml(language)}</span>` : "";
+          html.push(`<pre>${label}<code>${escapeHtml(code.join("\n"))}</code></pre>`);
+          continue;
+        }
+
+        const heading = line.match(/^\s{0,3}(#{1,6})\s+(.+)$/);
+        if (heading) {
+          const level = heading[1].length;
+          html.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
+          index += 1;
+          continue;
+        }
+
+        if (/^\s{0,3}((\*\s*){3,}|(-\s*){3,}|(_\s*){3,})$/.test(line)) {
+          html.push("<hr>");
+          index += 1;
+          continue;
+        }
+
+        if (index + 1 < lines.length && line.includes("|") && isTableSeparator(lines[index + 1])) {
+          const table = renderTable(lines, index);
+          html.push(table.html);
+          index = table.nextIndex;
+          continue;
+        }
+
+        if (/^\s*>\s?/.test(line)) {
+          const quote = [];
+          while (index < lines.length && /^\s*>\s?/.test(lines[index])) {
+            quote.push(lines[index].replace(/^\s*>\s?/, ""));
+            index += 1;
+          }
+          html.push(`<blockquote>${quote.map(inlineMarkdown).join("<br>")}</blockquote>`);
+          continue;
+        }
+
+        if (/^\s*(?:[-+*]|\d+[.)])\s+/.test(line)) {
+          const list = renderList(lines, index);
+          html.push(list.html);
+          index = list.nextIndex;
+          continue;
+        }
+
+        const paragraph = [];
+        while (index < lines.length) {
+          const candidate = lines[index];
+          if (!candidate.trim()) break;
+          if (paragraph.length && (
+            /^\s*```/.test(candidate) ||
+            /^\s{0,3}#{1,6}\s+/.test(candidate) ||
+            /^\s*>\s?/.test(candidate) ||
+            /^\s*(?:[-+*]|\d+[.)])\s+/.test(candidate) ||
+            (index + 1 < lines.length && candidate.includes("|") && isTableSeparator(lines[index + 1]))
+          )) break;
+          paragraph.push(candidate);
+          index += 1;
+        }
+
+        html.push(`<p>${paragraph.map(inlineMarkdown).join("<br>")}</p>`);
+      }
+
+      return html.join("");
+    }
+
+    function splitIntoBlocks(text) {
+      const source = String(text || "").replace(/\r\n?/g, "\n");
+      if (!source.trim()) return [""];
+
+      const result = [];
+      const current = [];
+      let inFence = false;
+
+      for (const line of source.split("\n")) {
+        if (/^\s*```/.test(line)) {
+          current.push(line);
+          inFence = !inFence;
+          continue;
+        }
+
+        if (!inFence && line.trim() === "") {
+          if (current.length) {
+            result.push(current.join("\n"));
+            current.length = 0;
+          }
+          continue;
+        }
+
+        current.push(line);
+      }
+
+      if (current.length) result.push(current.join("\n"));
+      return result.length ? result : [""];
+    }
+
+    function currentBlocksSnapshot() {
+      const snapshot = blocks.slice();
+      if (activeIndex !== null && activeTextarea) {
+        snapshot[activeIndex] = normalizeMarkdown(activeTextarea.value);
+      }
+      return snapshot;
+    }
+
+    function serializeBlocks(list = currentBlocksSnapshot()) {
+      return list.join("\n\n");
+    }
+
+    function normalizeMarkdown(value) {
+      return String(value).replace(/\r\n?/g, "\n").replace(/[ \t]+$/gm, "");
+    }
+
+    function encodeBase64Url(text) {
+      const bytes = new TextEncoder().encode(text);
+      let binary = "";
+      const chunkSize = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+      }
+      return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    }
+
+    function decodeBase64Url(value) {
+      const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+      const padded = base64 + "===".slice((base64.length + 3) % 4);
+      const binary = atob(padded);
+      const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+      return new TextDecoder().decode(bytes);
+    }
+
+    function readUrlText() {
+      const raw = location.hash.slice(1);
+      if (!raw) return "";
+
+      try {
+        const params = new URLSearchParams(raw);
+        const encoded = params.get("m");
+        if (encoded) return decodeBase64Url(encoded);
+        return params.get("t") || "";
+      } catch (_) {
+        return "";
+      }
+    }
+
+    function syncUrl(immediate = false) {
+      clearTimeout(urlTimer);
+      statusEl.textContent = "輸入中…";
+
+      const update = () => {
+        const text = serializeBlocks();
+        const base = location.href.split("#")[0];
+        const hash = text ? "#m=" + encodeBase64Url(text) : "";
+
+        try {
+          history.replaceState(null, "", base + hash);
+        } catch (_) {
+          if (location.hash !== hash) location.replace(base + hash);
+        }
+
+        statusEl.textContent = text ? `已寫入網址 · ${text.length} 字元` : "空白 · 未保存到磁碟";
+      };
+
+      if (immediate) update();
+      else urlTimer = window.setTimeout(update, 140);
+    }
+
+    function createRenderedBlock(index) {
+      const block = document.createElement("article");
+      block.className = "md-block";
+      block.dataset.index = String(index);
+      block.tabIndex = 0;
+      block.setAttribute("aria-label", `Markdown 區塊 ${index + 1}，點擊編輯`);
+      block.innerHTML = renderMarkdown(blocks[index]);
+      return block;
+    }
+
+    function renderAll() {
+      editor.replaceChildren(...blocks.map((_, index) => createRenderedBlock(index)));
+      activeIndex = null;
+      activeTextarea = null;
+      syncUrl(true);
+    }
+
+    function autoSize(textarea) {
+      textarea.style.height = "auto";
+      textarea.style.height = Math.min(textarea.scrollHeight, window.innerHeight * 0.7) + "px";
+    }
+
+    function activateBlock(index, selection = "end") {
+      if (index < 0 || index >= blocks.length) return;
+
+      if (activeIndex !== null) {
+        if (activeIndex === index) {
+          activeTextarea?.focus();
+          return;
+        }
+        commitActive();
+      }
+
+      const block = editor.querySelector(`.md-block[data-index="${index}"]`);
+      if (!block) return;
+
+      activeIndex = index;
+      block.classList.add("is-editing");
+      block.innerHTML = "";
+
+      const textarea = document.createElement("textarea");
+      textarea.className = "block-textarea";
+      textarea.value = blocks[index];
+      textarea.spellcheck = false;
+      textarea.setAttribute("aria-label", `編輯 Markdown 區塊 ${index + 1}`);
+      block.appendChild(textarea);
+      activeTextarea = textarea;
+
+      textarea.addEventListener("input", () => {
+        autoSize(textarea);
+        syncUrl();
+      });
+
+      textarea.addEventListener("keydown", handleEditorKeydown);
+      textarea.addEventListener("blur", () => {
+        window.setTimeout(() => {
+          if (activeTextarea === textarea && !textarea.matches(":focus")) commitActive();
+        }, 0);
+      });
+
+      requestAnimationFrame(() => {
+        autoSize(textarea);
+        textarea.focus();
+        const position = selection === "start" ? 0 : textarea.value.length;
+        textarea.setSelectionRange(position, position);
+      });
+    }
+
+    function commitActive(options = {}) {
+      if (activeIndex === null || !activeTextarea || committing) return activeIndex;
+      committing = true;
+
+      const index = activeIndex;
+      const value = normalizeMarkdown(activeTextarea.value).replace(/\n+$/g, "");
+      blocks[index] = value;
+
+      activeIndex = null;
+      activeTextarea = null;
+
+      if (options.removeEmpty && value === "" && blocks.length > 1) {
+        blocks.splice(index, 1);
+        renderAll();
+        committing = false;
+        return Math.min(index, blocks.length - 1);
+      }
+
+      const oldBlock = editor.querySelector(`.md-block[data-index="${index}"]`);
+      if (oldBlock) oldBlock.replaceWith(createRenderedBlock(index));
+      syncUrl(true);
+      committing = false;
+      return index;
+    }
+
+    function insertTextAtSelection(textarea, text) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      textarea.setRangeText(text, start, end, "end");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+
+    function insideOpenFence(value, cursor) {
+      const before = value.slice(0, cursor);
+      const count = (before.match(/^\s*```/gm) || []).length;
+      return count % 2 === 1;
+    }
+
+    function listContinuation(textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      if (start !== end) return false;
+
+      const before = textarea.value.slice(0, start);
+      const currentLine = before.split("\n").pop() || "";
+      const unordered = currentLine.match(/^(\s*)([-+*])\s+(?:\[([ xX])\]\s+)?(.*)$/);
+      const ordered = currentLine.match(/^(\s*)(\d+)([.)])\s+(.*)$/);
+
+      if (unordered) {
+        const [, indent, marker, task, content] = unordered;
+        if (!content.trim()) {
+          const lineStart = start - currentLine.length;
+          textarea.setRangeText("", lineStart, start, "end");
+          textarea.dispatchEvent(new Event("input", { bubbles: true }));
+          return false;
+        }
+        const prefix = task !== undefined ? `${indent}${marker} [ ] ` : `${indent}${marker} `;
+        insertTextAtSelection(textarea, "\n" + prefix);
+        return true;
+      }
+
+      if (ordered) {
+        const [, indent, number, punctuation, content] = ordered;
+        if (!content.trim()) {
+          const lineStart = start - currentLine.length;
+          textarea.setRangeText("", lineStart, start, "end");
+          textarea.dispatchEvent(new Event("input", { bubbles: true }));
+          return false;
+        }
+        insertTextAtSelection(textarea, `\n${indent}${Number(number) + 1}${punctuation} `);
+        return true;
+      }
+
+      return false;
+    }
+
+    function splitActiveBlock() {
+      if (activeIndex === null || !activeTextarea) return;
+
+      const index = activeIndex;
+      const start = activeTextarea.selectionStart;
+      const end = activeTextarea.selectionEnd;
+      const value = normalizeMarkdown(activeTextarea.value);
+      const before = value.slice(0, start).replace(/\n+$/g, "");
+      const after = value.slice(end).replace(/^\n+/g, "");
+
+      blocks[index] = before;
+      blocks.splice(index + 1, 0, after);
+      activeIndex = null;
+      activeTextarea = null;
+      renderAll();
+      activateBlock(index + 1, "start");
+    }
+
+    function handleEditorKeydown(event) {
+      const textarea = event.currentTarget;
+
+      if (event.key === "Tab") {
+        event.preventDefault();
+        insertTextAtSelection(textarea, "  ");
+        return;
+      }
+
+      if (event.key === "Escape" || ((event.ctrlKey || event.metaKey) && event.key === "Enter")) {
+        event.preventDefault();
+        commitActive();
+        return;
+      }
+
+      if (event.key === "Enter" && !event.shiftKey) {
+        if (insideOpenFence(textarea.value, textarea.selectionStart)) return;
+        if (listContinuation(textarea)) {
+          event.preventDefault();
+          return;
+        }
+        event.preventDefault();
+        splitActiveBlock();
+        return;
+      }
+
+      if (event.key === "Backspace" && textarea.selectionStart === 0 && textarea.selectionEnd === 0 && textarea.value === "" && activeIndex > 0) {
+        event.preventDefault();
+        const previous = activeIndex - 1;
+        blocks.splice(activeIndex, 1);
+        activeIndex = null;
+        activeTextarea = null;
+        renderAll();
+        activateBlock(previous, "end");
+      }
+    }
+
+    function addBlock(afterIndex = blocks.length - 1) {
+      if (activeIndex !== null) commitActive();
+      const insertAt = Math.max(0, Math.min(blocks.length, afterIndex + 1));
+      blocks.splice(insertAt, 0, "");
+      renderAll();
+      activateBlock(insertAt);
+    }
+
+    function showToast(message) {
+      clearTimeout(toastTimer);
+      toastEl.textContent = message;
+      toastEl.classList.add("show");
+      toastTimer = window.setTimeout(() => toastEl.classList.remove("show"), 1200);
+    }
+
+    editor.addEventListener("mousedown", event => {
+      const block = event.target.closest(".md-block");
+      if (!block || event.target.closest("textarea")) return;
+
+      const link = event.target.closest("a");
+      if (link && (event.metaKey || event.ctrlKey)) return;
+
+      event.preventDefault();
+      activateBlock(Number(block.dataset.index));
+    });
+
+    editor.addEventListener("keydown", event => {
+      if (event.target.matches(".md-block") && (event.key === "Enter" || event.key === " ")) {
+        event.preventDefault();
+        activateBlock(Number(event.target.dataset.index));
+      }
+    });
+
+    editor.addEventListener("dblclick", event => {
+      const block = event.target.closest(".md-block");
+      if (block && !event.target.closest("textarea")) activateBlock(Number(block.dataset.index));
+    });
+
+    newBlockBtn.addEventListener("mousedown", event => event.preventDefault());
+    newBlockBtn.addEventListener("click", () => addBlock(activeIndex ?? blocks.length - 1));
+
+    copyBtn.addEventListener("mousedown", event => event.preventDefault());
+    copyBtn.addEventListener("click", async () => {
+      const text = serializeBlocks();
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast("Markdown 已複製");
+      } catch (_) {
+        const helper = document.createElement("textarea");
+        helper.value = text;
+        helper.style.position = "fixed";
+        helper.style.opacity = "0";
+        document.body.appendChild(helper);
+        helper.select();
+        document.execCommand("copy");
+        helper.remove();
+        showToast("Markdown 已複製");
+      }
+    });
+
+    clearBtn.addEventListener("mousedown", event => event.preventDefault());
+    clearBtn.addEventListener("click", () => {
+      blocks = [""];
+      activeIndex = null;
+      activeTextarea = null;
+      renderAll();
+      activateBlock(0);
+      showToast("已清空");
+    });
+
+    window.addEventListener("hashchange", () => {
+      const incoming = readUrlText();
+      if (incoming !== serializeBlocks()) {
+        blocks = splitIntoBlocks(incoming);
+        renderAll();
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,718 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>MD HackPad</title>
+
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2216%22%20fill%3D%22%23070707%22/%3E%3Ctext%20x%3D%2250%22%20y%3D%2265%22%20font-size%3D%2254%22%20text-anchor%3D%22middle%22%20fill%3D%22%2339ff88%22%20font-family%3D%22monospace%22%3EMD%3C/text%3E%3C/svg%3E">
+
+  <style>
+    :root {
+      --bg: #070907;
+      --panel: #0b0f0c;
+      --panel-2: #101611;
+      --border: #254a31;
+      --accent: #39ff88;
+      --accent-soft: rgba(57, 255, 136, 0.12);
+      --text: #d8ffe5;
+      --muted: #7cab8b;
+      --danger: #ff7676;
+      --toolbar-height: 52px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+        "Liberation Mono", "Noto Sans Mono CJK TC", monospace;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--panel);
+      color: var(--text);
+      min-height: 32px;
+      padding: 5px 10px;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    button:focus-visible,
+    textarea:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+
+    button.active {
+      color: #001b09;
+      border-color: var(--accent);
+      background: var(--accent);
+      font-weight: 700;
+    }
+
+    button.danger:hover {
+      color: #fff;
+      border-color: var(--danger);
+      background: rgba(255, 118, 118, 0.18);
+    }
+
+    #app {
+      height: 100%;
+      display: grid;
+      grid-template-rows: var(--toolbar-height) minmax(0, 1fr) 27px;
+    }
+
+    #toolbar {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px;
+      overflow-x: auto;
+      background: #050705;
+      border-bottom: 1px solid var(--border);
+      scrollbar-width: thin;
+    }
+
+    .brand {
+      margin-right: 3px;
+      color: var(--accent);
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      user-select: none;
+    }
+
+    .separator {
+      width: 1px;
+      height: 24px;
+      margin: 0 2px;
+      flex: 0 0 auto;
+      background: var(--border);
+    }
+
+    #workspace {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      background: var(--border);
+      gap: 1px;
+    }
+
+    .pane {
+      min-width: 0;
+      min-height: 0;
+      background: var(--panel);
+    }
+
+    #editor {
+      display: block;
+      width: 100%;
+      height: 100%;
+      resize: none;
+      border: 0;
+      outline: 0;
+      padding: 20px 22px 80px;
+      background: var(--panel);
+      color: var(--text);
+      caret-color: var(--accent);
+      font: inherit;
+      font-size: 15px;
+      line-height: 1.65;
+      tab-size: 2;
+      overflow: auto;
+    }
+
+    #editor::placeholder { color: #54715d; }
+
+    #preview {
+      width: 100%;
+      height: 100%;
+      padding: 20px 26px 80px;
+      overflow: auto;
+      background: var(--panel-2);
+      color: #e4ffec;
+      line-height: 1.68;
+      overflow-wrap: anywhere;
+    }
+
+    #preview > :first-child { margin-top: 0; }
+    #preview > :last-child { margin-bottom: 0; }
+
+    #preview h1,
+    #preview h2,
+    #preview h3,
+    #preview h4,
+    #preview h5,
+    #preview h6 {
+      color: var(--accent);
+      line-height: 1.25;
+      margin: 1.25em 0 0.55em;
+    }
+
+    #preview h1,
+    #preview h2 {
+      padding-bottom: 0.3em;
+      border-bottom: 1px solid var(--border);
+    }
+
+    #preview p,
+    #preview ul,
+    #preview ol,
+    #preview blockquote,
+    #preview pre,
+    #preview table {
+      margin: 0.8em 0;
+    }
+
+    #preview a {
+      color: var(--accent);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 3px;
+    }
+
+    #preview blockquote {
+      margin-left: 0;
+      padding: 0.2em 1em;
+      color: #aed5b9;
+      border-left: 4px solid var(--accent);
+      background: rgba(57, 255, 136, 0.06);
+    }
+
+    #preview code {
+      border: 1px solid #1f4b2c;
+      border-radius: 5px;
+      padding: 0.1em 0.35em;
+      background: #06150b;
+      color: #aaffc7;
+      font-family: inherit;
+      font-size: 0.92em;
+    }
+
+    #preview pre {
+      overflow: auto;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #050b07;
+    }
+
+    #preview pre code {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: #c7ffd9;
+      white-space: pre;
+    }
+
+    #preview table {
+      display: block;
+      max-width: 100%;
+      border-collapse: collapse;
+      overflow-x: auto;
+    }
+
+    #preview th,
+    #preview td {
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    #preview th {
+      color: var(--accent);
+      background: rgba(57, 255, 136, 0.07);
+    }
+
+    #preview hr {
+      border: 0;
+      border-top: 1px solid var(--border);
+      margin: 1.6em 0;
+    }
+
+    #preview img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 7px;
+    }
+
+    #preview input[type="checkbox"] {
+      accent-color: var(--accent);
+      transform: translateY(1px);
+    }
+
+    #preview .empty-preview {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    #statusbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 9px;
+      overflow: hidden;
+      border-top: 1px solid var(--border);
+      background: #050705;
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    #status-message {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #stats { flex: 0 0 auto; }
+
+    #toast {
+      position: fixed;
+      left: 50%;
+      bottom: 44px;
+      z-index: 10;
+      transform: translate(-50%, 12px);
+      padding: 8px 12px;
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      background: #07110a;
+      color: var(--accent);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 140ms ease, transform 140ms ease;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+      font-size: 13px;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    body[data-view="edit"] #workspace { grid-template-columns: 1fr; }
+    body[data-view="edit"] #preview-pane { display: none; }
+
+    body[data-view="preview"] #workspace { grid-template-columns: 1fr; }
+    body[data-view="preview"] #editor-pane { display: none; }
+
+    @media (max-width: 760px) {
+      :root { --toolbar-height: 49px; }
+
+      .brand,
+      .separator.optional,
+      #copy-link-label {
+        display: none;
+      }
+
+      #toolbar { gap: 5px; padding: 7px; }
+      button { padding: 5px 8px; }
+      #editor { padding: 16px 15px 70px; font-size: 16px; }
+      #preview { padding: 16px 17px 70px; }
+
+      body[data-view="split"] #workspace {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+      }
+    }
+  </style>
+</head>
+<body data-view="split">
+  <div id="app">
+    <header id="toolbar" aria-label="工具列">
+      <span class="brand">MD HackPad</span>
+
+      <button type="button" data-view-button="edit">編輯</button>
+      <button type="button" data-view-button="split" class="active">分割</button>
+      <button type="button" data-view-button="preview">預覽</button>
+
+      <span class="separator"></span>
+
+      <button type="button" id="copy-link" title="複製包含目前內容的網址">
+        <span id="copy-link-label">複製網址</span><span aria-hidden="true"> ↗</span>
+      </button>
+      <button type="button" id="clear" class="danger">清空</button>
+
+      <span class="separator optional"></span>
+      <button type="button" id="help" title="顯示 Markdown 範例">語法</button>
+    </header>
+
+    <main id="workspace">
+      <section id="editor-pane" class="pane" aria-label="Markdown 編輯器">
+        <textarea
+          id="editor"
+          autofocus
+          spellcheck="true"
+          aria-label="輸入 Markdown"
+          placeholder="# 臨時筆記
+
+直接輸入 Markdown。內容不會存入資料庫；目前文字會編碼在網址的 # 後面。"
+        ></textarea>
+      </section>
+
+      <section id="preview-pane" class="pane" aria-label="Markdown 預覽">
+        <article id="preview"></article>
+      </section>
+    </main>
+
+    <footer id="statusbar">
+      <span id="status-message">網址暫存模式：關閉分頁後，可從瀏覽器紀錄開回最後內容。</span>
+      <span id="stats">0 字元 · URL 0</span>
+    </footer>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <!-- 固定版本，避免 CDN 更新後突然破壞功能。 -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@18.0.5/lib/marked.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.12/dist/purify.min.js"></script>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const editor = document.getElementById("editor");
+      const preview = document.getElementById("preview");
+      const statusMessage = document.getElementById("status-message");
+      const stats = document.getElementById("stats");
+      const toast = document.getElementById("toast");
+      const viewButtons = [...document.querySelectorAll("[data-view-button]")];
+
+      const HELP_TEXT = `# Markdown 快速語法
+
+## 文字
+
+**粗體**、*斜體*、~~刪除線~~、\`行內程式碼\`
+
+## 清單
+
+- 無序項目
+- 第二項
+  - 巢狀項目
+
+1. 第一項
+2. 第二項
+
+- [x] 已完成
+- [ ] 待辦事項
+
+## 引用
+
+> 這是一段引用。
+
+## 連結與圖片
+
+[OpenAI](https://openai.com)
+
+![圖片替代文字](https://picsum.photos/480/220)
+
+## 表格
+
+| 項目 | 狀態 |
+| --- | --- |
+| Markdown | 可用 |
+| 網址暫存 | 可用 |
+
+## 程式碼
+
+\`\`\`js
+const message = "Hello, HackPad!";
+console.log(message);
+\`\`\`
+
+---
+
+快捷鍵：
+
+- Ctrl/Cmd + Enter：切換編輯與預覽
+- Ctrl/Cmd + Shift + L：複製目前網址
+- Tab：在編輯區插入兩個空格
+`;
+
+      let urlTimer = 0;
+      let renderTimer = 0;
+      let toastTimer = 0;
+      let currentView = "split";
+      let isApplyingHash = false;
+
+      function getBaseUrl() {
+        return location.href.split("#")[0];
+      }
+
+      function readUrlText() {
+        const raw = location.hash.slice(1);
+        if (!raw) return "";
+
+        try {
+          return new URLSearchParams(raw).get("t") || "";
+        } catch (error) {
+          console.warn("無法讀取網址內容：", error);
+          return "";
+        }
+      }
+
+      function buildHash(text) {
+        return text ? "#t=" + encodeURIComponent(text) : "";
+      }
+
+      function buildCurrentUrl() {
+        return getBaseUrl() + buildHash(editor.value);
+      }
+
+      function replaceUrl(text) {
+        const base = getBaseUrl();
+        const hash = buildHash(text);
+        const nextUrl = base + hash;
+
+        try {
+          history.replaceState(null, document.title, nextUrl);
+        } catch (error) {
+          // 某些瀏覽器會限制 data: 或 file: URL 的 History API。
+          // 只替換 fragment，可避免每次輸入都新增一筆瀏覽紀錄。
+          try {
+            isApplyingHash = true;
+            location.replace(hash || "#");
+          } catch (fallbackError) {
+            console.warn("無法同步網址：", fallbackError);
+            statusMessage.textContent = "這個瀏覽器不允許修改目前網址；內容仍可正常編輯。";
+          } finally {
+            setTimeout(() => { isApplyingHash = false; }, 0);
+          }
+        }
+      }
+
+      function scheduleUrlSync() {
+        clearTimeout(urlTimer);
+        urlTimer = setTimeout(() => {
+          replaceUrl(editor.value);
+          updateStats();
+        }, 180);
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      function renderMarkdown() {
+        const source = editor.value.replace(
+          /^[\u200B\u200C\u200D\u200E\u200F\uFEFF]/,
+          ""
+        );
+
+        if (!source.trim()) {
+          preview.innerHTML = '<p class="empty-preview">Markdown 預覽會顯示在這裡。</p>';
+          return;
+        }
+
+        if (!window.marked || !window.DOMPurify) {
+          preview.innerHTML =
+            '<p class="empty-preview">Markdown 函式庫尚未載入。請確認目前有網路連線。</p>' +
+            "<pre><code>" + escapeHtml(source) + "</code></pre>";
+          statusMessage.textContent = "Markdown 函式庫未載入，目前顯示純文字。";
+          return;
+        }
+
+        try {
+          marked.setOptions({
+            gfm: true,
+            breaks: true
+          });
+
+          const unsafeHtml = marked.parse(source);
+          const safeHtml = DOMPurify.sanitize(unsafeHtml, {
+            USE_PROFILES: { html: true }
+          });
+
+          preview.innerHTML = safeHtml;
+
+          preview.querySelectorAll("a").forEach((link) => {
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+          });
+
+          preview.querySelectorAll("img").forEach((image) => {
+            image.loading = "lazy";
+            image.referrerPolicy = "no-referrer";
+          });
+        } catch (error) {
+          console.error("Markdown 渲染失敗：", error);
+          preview.innerHTML =
+            '<p class="empty-preview">Markdown 渲染失敗，以下顯示原始文字。</p>' +
+            "<pre><code>" + escapeHtml(source) + "</code></pre>";
+        }
+      }
+
+      function scheduleRender() {
+        clearTimeout(renderTimer);
+        renderTimer = setTimeout(renderMarkdown, 40);
+      }
+
+      function updateStats() {
+        const textLength = editor.value.length;
+        const urlLength = buildCurrentUrl().length;
+        stats.textContent = `${textLength.toLocaleString()} 字元 · URL ${urlLength.toLocaleString()}`;
+
+        if (urlLength > 30000) {
+          statusMessage.textContent = "警告：網址已非常長，瀏覽器紀錄或同步功能可能無法完整保留。";
+        } else if (urlLength > 12000) {
+          statusMessage.textContent = "提醒：網址開始變長，建議只用於臨時短筆記。";
+        } else {
+          statusMessage.textContent = "網址暫存模式：關閉分頁後，可從瀏覽器紀錄開回最後內容。";
+        }
+      }
+
+      function showToast(message) {
+        clearTimeout(toastTimer);
+        toast.textContent = message;
+        toast.classList.add("show");
+        toastTimer = setTimeout(() => toast.classList.remove("show"), 1600);
+      }
+
+      function setView(view) {
+        if (!["edit", "split", "preview"].includes(view)) return;
+        currentView = view;
+        document.body.dataset.view = view;
+
+        viewButtons.forEach((button) => {
+          const isActive = button.dataset.viewButton === view;
+          button.classList.toggle("active", isActive);
+          button.setAttribute("aria-pressed", String(isActive));
+        });
+
+        if (view === "edit") editor.focus();
+        if (view === "preview") renderMarkdown();
+      }
+
+      async function copyCurrentUrl() {
+        clearTimeout(urlTimer);
+        replaceUrl(editor.value);
+        const url = buildCurrentUrl();
+
+        try {
+          await navigator.clipboard.writeText(url);
+          showToast("已複製目前網址");
+        } catch (error) {
+          const helper = document.createElement("textarea");
+          helper.value = url;
+          helper.setAttribute("readonly", "");
+          helper.style.position = "fixed";
+          helper.style.opacity = "0";
+          document.body.appendChild(helper);
+          helper.select();
+
+          try {
+            const copied = document.execCommand("copy");
+            showToast(copied ? "已複製目前網址" : "請手動複製網址列");
+          } catch (fallbackError) {
+            showToast("請手動複製網址列");
+          } finally {
+            helper.remove();
+          }
+        }
+      }
+
+      function clearAll() {
+        if (!editor.value || confirm("確定要清空目前所有臨時文字嗎？")) {
+          editor.value = "";
+          replaceUrl("");
+          renderMarkdown();
+          updateStats();
+          editor.focus();
+          showToast("已清空");
+        }
+      }
+
+      function insertAtCursor(text) {
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        editor.setRangeText(text, start, end, "end");
+        editor.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+
+      editor.addEventListener("input", () => {
+        scheduleRender();
+        scheduleUrlSync();
+        updateStats();
+      });
+
+      editor.addEventListener("keydown", (event) => {
+        if (event.key === "Tab") {
+          event.preventDefault();
+          insertAtCursor("  ");
+        }
+      });
+
+      viewButtons.forEach((button) => {
+        button.addEventListener("click", () => setView(button.dataset.viewButton));
+      });
+
+      document.getElementById("copy-link").addEventListener("click", copyCurrentUrl);
+      document.getElementById("clear").addEventListener("click", clearAll);
+      document.getElementById("help").addEventListener("click", () => {
+        if (editor.value.trim() && !confirm("要用 Markdown 語法範例取代目前文字嗎？")) return;
+        editor.value = HELP_TEXT;
+        editor.dispatchEvent(new Event("input", { bubbles: true }));
+        setView(window.innerWidth <= 760 ? "edit" : "split");
+        editor.focus();
+      });
+
+      document.addEventListener("keydown", (event) => {
+        const commandKey = event.ctrlKey || event.metaKey;
+
+        if (commandKey && event.key === "Enter") {
+          event.preventDefault();
+          setView(currentView === "preview" ? "edit" : "preview");
+        }
+
+        if (commandKey && event.shiftKey && event.key.toLowerCase() === "l") {
+          event.preventDefault();
+          copyCurrentUrl();
+        }
+      });
+
+      window.addEventListener("hashchange", () => {
+        if (isApplyingHash) return;
+        const hashText = readUrlText();
+        if (hashText !== editor.value) {
+          editor.value = hashText;
+          renderMarkdown();
+          updateStats();
+        }
+      });
+
+      window.addEventListener("beforeunload", () => {
+        clearTimeout(urlTimer);
+        replaceUrl(editor.value);
+      });
+
+      // 初始載入
+      editor.value = readUrlText();
+      renderMarkdown();
+      updateStats();
+
+      if (window.innerWidth <= 760) {
+        setView("edit");
+      } else {
+        setView("split");
+      }
+    })();
+  </script>
+</body>
+</html>

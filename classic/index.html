@@ -1,4 +1,4 @@
-data:text/html;charset=utf-8,<!doctypehtml>
+<!doctypehtml>
 <html>
 <head>
 <meta charset="utf-8">
@@ -25,9 +25,25 @@ data:text/html;charset=utf-8,<!doctypehtml>
 <textarea id="ta" autofocus placeholder="Enter Markdown..."></textarea>
 <div id="preview" style="display:none"></div>
 <script>
-  const ta=document.getElementById("ta"), pv=document.getElementById("preview"), LSK="mdpad";
-  ta.value=localStorage[LSK]||"";
-  ta.oninput=()=>localStorage[LSK]=ta.value;
+  const ta=document.getElementById("ta"), pv=document.getElementById("preview");
+  let urlTimer=0;
+  function readUrlText(){
+    const raw=location.hash.slice(1);
+    if(!raw)return "";
+    try{return new URLSearchParams(raw).get("t")||""}
+    catch(e){return ""}
+  }
+  function syncUrl(){
+    clearTimeout(urlTimer);
+    urlTimer=setTimeout(()=>{
+      const base=location.href.split("#")[0];
+      const hash=ta.value?"#t="+encodeURIComponent(ta.value):"";
+      try{history.replaceState(null,"",base+hash)}
+      catch(e){if(location.hash!==hash)location.replace(base+hash)}
+    },120);
+  }
+  ta.value=readUrlText();
+  ta.oninput=syncUrl;
 
   function esc(s){return s.replace(/[&<>\"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]))}
   function md(s){
@@ -53,4 +69,3 @@ data:text/html;charset=utf-8,<!doctypehtml>
 </script>
 </body>
 </html>
-
